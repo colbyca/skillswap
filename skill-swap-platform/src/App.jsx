@@ -8,17 +8,18 @@ import SkillsMatchPage from './pages/SkillsMatchPage';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import Profile from './components/Auth/Profile';
+import ProfileSetup from './components/Auth/ProfileSetup';
+import EditProfile from './components/Auth/EditProfile';
 import PrivateRoute from './components/Auth/PrivateRoute';
 import { AuthProvider } from './contexts/AuthContext';
-import './App.css';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="app">
+        <div className="min-h-screen flex flex-col bg-dark-900 text-gray-100">
           <Navbar />
-          <main className="main-content">
+          <main className="flex-grow container mx-auto px-4 py-8">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/dashboard" element={
@@ -33,9 +34,19 @@ function App() {
               } />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/profile-setup" element={
+                <PrivateRoute>
+                  <ProfileSetup />
+                </PrivateRoute>
+              } />
               <Route path="/profile" element={
                 <PrivateRoute>
                   <Profile />
+                </PrivateRoute>
+              } />
+              <Route path="/edit-profile" element={
+                <PrivateRoute>
+                  <EditProfile />
                 </PrivateRoute>
               } />
               <Route path="*" element={<Navigate to="/" replace />} />
