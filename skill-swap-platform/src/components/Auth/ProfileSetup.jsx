@@ -16,15 +16,42 @@ const ProfileSetup = () => {
   const [filteredSkills, setFilteredSkills] = useState([]);
   const [skillsIHave, setSkillsIHave] = useState([]);
   const [skillsIWant, setSkillsIWant] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [allTags, setAllTags] = useState([]);
+  const [contactMethods, setContactMethods] = useState({
+    email: '',
+    phone: '',
+    discord: '',
+    instagram: '',
+    twitter: ''
+  });
+  const [selectedContactTypes, setSelectedContactTypes] = useState([]);
+
+  const contactTypes = [
+    { id: 'email', label: 'Email', placeholder: 'your@email.com', validation: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
+    { id: 'phone', label: 'Phone Number', placeholder: '+1 (555) 555-5555', validation: /^\+?[\d\s-()]{10,}$/ },
+    { id: 'discord', label: 'Discord', placeholder: 'username#1234', validation: /^.{3,32}#[0-9]{4}$/ },
+    { id: 'instagram', label: 'Instagram', placeholder: '@username', validation: /^@?[a-zA-Z0-9._]{1,30}$/ },
+    { id: 'twitter', label: 'Twitter', placeholder: '@username', validation: /^@?[a-zA-Z0-9_]{1,15}$/ }
+  ];
 
   useEffect(() => {
     // Fetch available skills from Firestore
     const fetchSkills = async () => {
       try {
         const skillsSnapshot = await getDocs(collection(db, 'skills'));
-        const skills = skillsSnapshot.docs.map(doc => doc.data().name);
+        const skills = skillsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
         setAvailableSkills(skills);
-        setFilteredSkills(skills);
+
+        // Extract all unique tags
+        const tags = new Set();
+        skills.forEach(skill => {
+          skill.tags.forEach(tag => tags.add(tag));
+        });
+        setAllTags([...tags]);
       } catch (error) {
         setError('Failed to fetch skills: ' + error.message);
       }
@@ -34,23 +61,63 @@ const ProfileSetup = () => {
   }, []);
 
   useEffect(() => {
-    // Filter skills based on search term
-    const filtered = availableSkills.filter(skill =>
-      skill.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filter skills based on search term and selected tags
+    const filtered = availableSkills.filter(skill => {
+      const matchesSearch = skill.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        skill.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const matchesTags = selectedTags.length === 0 ||
+        selectedTags.every(tag => skill.tags.includes(tag));
+
+      return matchesSearch && matchesTags;
+    });
     setFilteredSkills(filtered);
-  }, [searchTerm, availableSkills]);
+  }, [searchTerm, availableSkills, selectedTags]);
 
   const handleSkillSelect = (skill, direction) => {
     if (direction === 'left') {
-      if (!skillsIHave.includes(skill)) {
-        setSkillsIHave([...skillsIHave, skill]);
+      if (!skillsIHave.some(s => s.id === skill.id)) {
+        setSkillsIHave([...skillsIHave, { id: skill.id, name: skill.name }]);
       }
     } else {
-      if (!skillsIWant.includes(skill)) {
-        setSkillsIWant([...skillsIWant, skill]);
+      if (!skillsIWant.some(s => s.id === skill.id)) {
+        setSkillsIWant([...skillsIWant, { id: skill.id, name: skill.name }]);
       }
     }
+  };
+
+  const toggleTag = (tag) => {
+    setSelectedTags(prev =>
+      prev.includes(tag)
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    );
+  };
+
+  const toggleContactType = (type) => {
+    setSelectedContactTypes(prev => {
+      if (prev.includes(type)) {
+        const newContactMethods = { ...contactMethods };
+        delete newContactMethods[type];
+        setContactMethods(newContactMethods);
+        return prev.filter(t => t !== type);
+      } else {
+        return [...prev, type];
+      }
+    });
+  };
+
+  const handleContactChange = (type, value) => {
+    setContactMethods(prev => ({
+      ...prev,
+      [type]: value
+    }));
+  };
+
+  const validateContactMethod = (type, value) => {
+    const contactType = contactTypes.find(t => t.id === type);
+    if (!contactType) return true;
+    return contactType.validation.test(value);
   };
 
   const handleSubmit = async (e) => {
@@ -58,6 +125,24 @@ const ProfileSetup = () => {
     if (!name.trim()) {
       setError('Name is required');
       return;
+    }
+
+    // Check if at least one contact method is provided
+    const hasValidContactMethod = Object.entries(contactMethods).some(([type, value]) =>
+      selectedContactTypes.includes(type) && value && value.trim() !== ''
+    );
+
+    if (!hasValidContactMethod) {
+      setError('At least one contact method is required');
+      return;
+    }
+
+    // Validate all contact methods
+    for (const type of selectedContactTypes) {
+      if (!validateContactMethod(type, contactMethods[type])) {
+        setError(`Invalid ${type} format`);
+        return;
+      }
     }
 
     try {
@@ -68,8 +153,9 @@ const ProfileSetup = () => {
       await setDoc(doc(db, 'users', currentUser.uid), {
         name,
         bio,
-        skillsIHave,
-        skillsIWant,
+        skillsIHave: skillsIHave.map(skill => skill.id),
+        skillsIWant: skillsIWant.map(skill => skill.id),
+        contactMethods,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -116,84 +202,129 @@ const ProfileSetup = () => {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-2">
-            Search Skills
-          </label>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Type to search skills..."
-            className="w-full px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <div className="mt-2 max-h-40 overflow-y-auto">
-            {filteredSkills.map((skill) => (
-              <div
-                key={skill}
-                className="flex items-center justify-between p-2 hover:bg-dark-700 rounded-lg"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleSkillSelect(skill, 'left')}
-                  className="text-blue-400 hover:text-blue-300"
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <h3 className="text-lg font-medium text-gray-100 mb-2">Skills I Have</h3>
+            <div className="bg-dark-700 p-4 rounded-lg min-h-[200px] max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-dark-600 scrollbar-track-dark-800">
+              {skillsIHave.map((skill) => (
+                <div
+                  key={skill.id}
+                  className="flex items-center justify-between p-2 hover:bg-dark-600 rounded-lg"
                 >
-                  ←
-                </button>
-                <span className="text-gray-100">{skill}</span>
-                <button
-                  type="button"
-                  onClick={() => handleSkillSelect(skill, 'right')}
-                  className="text-blue-400 hover:text-blue-300"
+                  <span className="text-gray-100">{skill.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSkillsIHave(skillsIHave.filter(s => s.id !== skill.id))}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-400 mb-2">
+              Search Skills
+            </label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Type to search skills or tags..."
+              className="w-full px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <div className="mt-4 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-dark-600 scrollbar-track-dark-800">
+              {filteredSkills.map((skill) => (
+                <div
+                  key={skill.id}
+                  className="flex items-center justify-between p-2 hover:bg-dark-700 rounded-lg"
                 >
-                  →
-                </button>
-              </div>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => handleSkillSelect(skill, 'left')}
+                    className="text-blue-400 hover:text-blue-300 text-2xl"
+                  >
+                    ←
+                  </button>
+                  <div className="flex-1 px-4">
+                    <div className="text-gray-100">{skill.name}</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {skill.tags.map(tag => (
+                        <span
+                          key={tag}
+                          className="text-xs bg-dark-600 text-gray-400 px-2 py-0.5 rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSkillSelect(skill, 'right')}
+                    className="text-blue-400 hover:text-blue-300 text-2xl"
+                  >
+                    →
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <h3 className="text-lg font-medium text-gray-100 mb-2">Skills I Want</h3>
+            <div className="bg-dark-700 p-4 rounded-lg min-h-[200px] max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-dark-600 scrollbar-track-dark-800">
+              {skillsIWant.map((skill) => (
+                <div
+                  key={skill.id}
+                  className="flex items-center justify-between p-2 hover:bg-dark-600 rounded-lg"
+                >
+                  <span className="text-gray-100">{skill.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSkillsIWant(skillsIWant.filter(s => s.id !== skill.id))}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h3 className="text-lg font-medium text-gray-100 mb-2">Skills I Have</h3>
-            <div className="bg-dark-700 p-4 rounded-lg min-h-[200px]">
-              {skillsIHave.map((skill) => (
-                <div
-                  key={skill}
-                  className="flex items-center justify-between p-2 hover:bg-dark-600 rounded-lg"
-                >
-                  <span className="text-gray-100">{skill}</span>
-                  <button
-                    type="button"
-                    onClick={() => setSkillsIHave(skillsIHave.filter(s => s !== skill))}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium text-gray-100 mb-2">Skills I Want</h3>
-            <div className="bg-dark-700 p-4 rounded-lg min-h-[200px]">
-              {skillsIWant.map((skill) => (
-                <div
-                  key={skill}
-                  className="flex items-center justify-between p-2 hover:bg-dark-600 rounded-lg"
-                >
-                  <span className="text-gray-100">{skill}</span>
-                  <button
-                    type="button"
-                    onClick={() => setSkillsIWant(skillsIWant.filter(s => s !== skill))}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
+        <div>
+          <h3 className="text-lg font-medium text-gray-100 mb-4">Contact Methods</h3>
+          <div className="space-y-4">
+            {contactTypes.map(type => (
+              <div key={type.id} className="flex items-center space-x-4">
+                <input
+                  type="checkbox"
+                  id={type.id}
+                  checked={selectedContactTypes.includes(type.id)}
+                  onChange={() => toggleContactType(type.id)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-dark-600 rounded"
+                />
+                <label htmlFor={type.id} className="text-gray-300">
+                  {type.label}
+                </label>
+                {selectedContactTypes.includes(type.id) && (
+                  <input
+                    type="text"
+                    value={contactMethods[type.id] || ''}
+                    onChange={(e) => handleContactChange(type.id, e.target.value)}
+                    placeholder={type.placeholder}
+                    className={`flex-1 px-4 py-2 bg-dark-700 border ${contactMethods[type.id] && !validateContactMethod(type.id, contactMethods[type.id])
+                      ? 'border-red-500'
+                      : 'border-dark-600'
+                      } rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                )}
+              </div>
+            ))}
           </div>
         </div>
 

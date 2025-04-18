@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import { FaEnvelope, FaPhone, FaDiscord, FaInstagram, FaTwitter } from 'react-icons/fa';
 
 const Profile = () => {
   const { currentUser, logout } = useAuth();
@@ -17,7 +18,21 @@ const Profile = () => {
         try {
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
           if (userDoc.exists()) {
-            setUserProfile(userDoc.data());
+            const userData = userDoc.data();
+
+            // Fetch skill details for skillsIHave and skillsIWant
+            const skillsIHaveDocs = await Promise.all(
+              (userData.skillsIHave || []).map(skillId => getDoc(doc(db, 'skills', skillId)))
+            );
+            const skillsIWantDocs = await Promise.all(
+              (userData.skillsIWant || []).map(skillId => getDoc(doc(db, 'skills', skillId)))
+            );
+
+            setUserProfile({
+              ...userData,
+              skillsIHave: skillsIHaveDocs.map(doc => ({ id: doc.id, name: doc.data().name })),
+              skillsIWant: skillsIWantDocs.map(doc => ({ id: doc.id, name: doc.data().name }))
+            });
           }
         } catch (error) {
           setError('Failed to fetch profile: ' + error.message);
@@ -38,6 +53,40 @@ const Profile = () => {
       setError('Failed to log out: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getContactIcon = (type) => {
+    switch (type) {
+      case 'email':
+        return <FaEnvelope className="text-blue-400" />;
+      case 'phone':
+        return <FaPhone className="text-green-400" />;
+      case 'discord':
+        return <FaDiscord className="text-indigo-400" />;
+      case 'instagram':
+        return <FaInstagram className="text-pink-400" />;
+      case 'twitter':
+        return <FaTwitter className="text-blue-400" />;
+      default:
+        return null;
+    }
+  };
+
+  const getContactLink = (type, value) => {
+    switch (type) {
+      case 'email':
+        return `mailto:${value}`;
+      case 'phone':
+        return `tel:${value.replace(/[^0-9+]/g, '')}`;
+      case 'discord':
+        return `https://discord.com/users/${value}`;
+      case 'instagram':
+        return `https://instagram.com/${value.replace('@', '')}`;
+      case 'twitter':
+        return `https://twitter.com/${value.replace('@', '')}`;
+      default:
+        return '#';
     }
   };
 
@@ -82,10 +131,10 @@ const Profile = () => {
                   {userProfile.skillsIHave?.length > 0 ? (
                     userProfile.skillsIHave.map((skill) => (
                       <div
-                        key={skill}
+                        key={skill.id}
                         className="bg-dark-600 px-3 py-2 rounded-lg text-gray-100"
                       >
-                        {skill}
+                        {skill.name}
                       </div>
                     ))
                   ) : (
@@ -100,16 +149,45 @@ const Profile = () => {
                   {userProfile.skillsIWant?.length > 0 ? (
                     userProfile.skillsIWant.map((skill) => (
                       <div
-                        key={skill}
+                        key={skill.id}
                         className="bg-dark-600 px-3 py-2 rounded-lg text-gray-100"
                       >
-                        {skill}
+                        {skill.name}
                       </div>
                     ))
                   ) : (
                     <p className="text-gray-400">No skills added yet</p>
                   )}
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-dark-700 p-4 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-100 mb-4">Contact Methods</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {userProfile.contactMethods && Object.entries(userProfile.contactMethods).filter(([_, value]) => value && value.trim() !== '').length > 0 ? (
+                  Object.entries(userProfile.contactMethods)
+                    .filter(([_, value]) => value && value.trim() !== '')
+                    .map(([type, value]) => (
+                      <a
+                        key={type}
+                        href={getContactLink(type, value)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-dark-600 p-3 rounded-lg hover:bg-dark-500 transition-colors flex items-center space-x-3"
+                      >
+                        <div className="text-xl">
+                          {getContactIcon(type)}
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-400 capitalize">{type}</p>
+                          <p className="text-gray-100">{value}</p>
+                        </div>
+                      </a>
+                    ))
+                ) : (
+                  <p className="text-gray-400 md:col-span-2">No contact methods added yet</p>
+                )}
               </div>
             </div>
 

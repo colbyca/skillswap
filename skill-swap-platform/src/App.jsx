@@ -19,7 +19,7 @@ function App() {
       <Router>
         <div className="min-h-screen flex flex-col bg-dark-900 text-gray-100">
           <Navbar />
-          <main className="flex-grow container mx-auto px-4 py-8">
+          <main className="flex-grow container mx-auto px-4 pt-24 px-4 py-8">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/dashboard" element={
