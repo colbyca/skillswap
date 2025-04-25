@@ -5,7 +5,7 @@ import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
 const ProfileSetup = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, setHasCompletedProfile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -160,6 +160,8 @@ const ProfileSetup = () => {
         updatedAt: new Date().toISOString()
       });
 
+      // Set profile completion status
+      setHasCompletedProfile(true);
       navigate('/dashboard');
     } catch (error) {
       setError('Failed to create profile: ' + error.message);

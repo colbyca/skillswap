@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { auth } from '../../firebase/config';
 
 const Register = () => {
   const [email, setEmail] = useState('');
@@ -24,9 +25,21 @@ const Register = () => {
     try {
       setError('');
       setLoading(true);
-      await registerUser(email, password, displayName);
-      navigate('/profile-setup');
+      console.log('Starting registration');
+      const user = await registerUser(email, password, displayName);
+      console.log('Registration successful, user:', user);
+
+      // Check if user is authenticated and navigate
+      if (auth.currentUser) {
+        console.log('User is authenticated, navigating to profile-setup');
+        navigate('/profile-setup', { replace: true });
+        window.location.reload(); // Force a page reload
+      } else {
+        console.error('User not authenticated after registration');
+        setError('Registration successful but authentication failed');
+      }
     } catch (error) {
+      console.error('Registration error:', error);
       setError('Failed to create an account: ' + error.message);
     } finally {
       setLoading(false);

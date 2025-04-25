@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Navbar = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, hasCompletedProfile } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -13,6 +13,49 @@ const Navbar = () => {
     } catch (error) {
       console.error('Failed to log out:', error);
     }
+  };
+
+  const renderAuthLinks = () => {
+    if (!currentUser) {
+      return (
+        <>
+          <Link to="/login" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+            Login
+          </Link>
+          <Link to="/register" className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+            Register
+          </Link>
+        </>
+      );
+    }
+
+    if (!hasCompletedProfile) {
+      return (
+        <Link to="/profile-setup" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+          Complete Profile
+        </Link>
+      );
+    }
+
+    return (
+      <>
+        <Link to="/dashboard" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+          Dashboard
+        </Link>
+        <Link to="/skills-match" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+          Skills Match
+        </Link>
+        <Link to="/profile" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+          Profile
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+        >
+          Logout
+        </button>
+      </>
+    );
   };
 
   return (
@@ -28,34 +71,7 @@ const Navbar = () => {
             <Link to="/" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
               Home
             </Link>
-            {currentUser ? (
-              <>
-                <Link to="/dashboard" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                  Dashboard
-                </Link>
-                <Link to="/skills-match" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                  Skills Match
-                </Link>
-                <Link to="/profile" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                  Profile
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="text-gray-300 hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                  Login
-                </Link>
-                <Link to="/register" className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                  Register
-                </Link>
-              </>
-            )}
+            {renderAuthLinks()}
           </div>
         </div>
       </div>
